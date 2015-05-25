@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>Raid Leader</title>
+    <script src="https://code.createjs.com/easeljs-0.8.0.min.js"></script>
+</head>
+<script type="text/javascript">
+    /**
+     * Created by david on 13/05/15.
+     */
+    var canvas;
+    var stage;
+    var g;
+    var element;
+    var heroList;
+
+    function loadGame() {
+        canvas = document.getElementById('main');
+        stage = new createjs.Stage(canvas);
+        console.log(createjs.Touch.isSupported());
+        createjs.Touch.enable(stage);
+        g = new createjs.Graphics();
+        createjs.Ticker.setFPS(60);
+
+        /*var heroList = new HeroList();
+        heroList.addHero(new Hero(150,150));
+        heroList.addHero(new Hero(300,150));
+        heroList.addHero(new Hero(150,300));
+        heroList.addHero(new Hero(300,300));*/
+        var background = new createjs.Container();
+        g.beginFill("#555555").drawRect(0, 0, 100, 100);
+        var shape = new createjs.Shape(g);
+        shape.x = 0;
+        shape.y = 0;
+        background.addChild(shape);
+
+        stage.addChild(background);
+        stage.update();
+        background.addEventListener('pressmove', drawBackgroundPath);
+        background.addEventListener('pressup', selectPath);
+
+
+        heroList = [];
+        heroList.push(new Hero(150,150));
+        heroList.push(new Hero(150,150));
+        heroList.push(new Hero(150,150));
+        heroList.push(new Hero(150,150));
+        heroList.push(new Hero(150,150));
+        heroList.push(new Hero(150,150));
+        heroList.push(new Hero(150,150));
+        heroList.push(new Hero(150,150));
+    }
+
+    function selectPath(event) {
+        console.log("selecting path");
+        console.log(event.target.parent.path);
+        console.log(heroList.length);
+        for (var i = 0; i < heroList.length; i++) {
+            if (pnpoly(event.target.parent.path, heroList[i].point)) {
+                var s = heroList[i].shape;
+                s.overColor = "#3281FF"
+                s.outColor = "#FF0000"
+            }
+        }
+        event.target.parent.path.length = 0;
+        event.target.parent.path = null;
+    }
+
+    function pnpoly(points, testPoint)
+    {
+        console.log("testing points "+testPoint.x + "," + testPoint.y);
+        var i, j, c = 0;
+        for (i = 0, j = points.length-1; i < points.length; j = i++) {
+            if ( ((points[i].y>testPoint.y) != (points[j].y>testPoint.y)) &&
+                    (testPoint.x < ((points[j].x-points[i].x) * (testPoint.y-points[i].y) / (points[j].y-points[i].y) + points[i].x)) )
+                c = !c;
+        }
+        console.log(c);
+        return c;
+    }
+
+    function drawPath(event){
+        //console.log(event.target.parent);
+        var x = event.stageX;// - event.target.parent.point.x;
+        var y = event.stageY;// - event.target.parent.point.y;
+        //console.log('finger #' + event.pointerID + ' at ' + x + ', ' + y);
+        if (event.target.parent.path == null) {
+            event.target.parent.path = new Path([{x: x, y: y}]);
+        }
+        else {
+            event.target.parent.path.addPoint({x: x, y: y});
+        }
+    }
+
+
+    function drawBackgroundPath(event){
+        //console.log(event.target.parent);
+        var x = event.stageX;// - event.target.parent.point.x;
+        var y = event.stageY;// - event.target.parent.point.y;
+        //console.log('finger #' + event.pointerID + ' at ' + x + ', ' + y);
+        if (event.target.parent.path == null) {
+            event.target.parent.path = new Path([{x: x, y: y}]);
+        }
+        else {
+            event.target.parent.path.addPoint({x: x, y: y});
+        }
+    }
+
+    Hero.prototype = new createjs.Container();
+
+    function Hero(x,y) {
+        createjs.Container.apply(this);
+        //createjs.Container.apply(this, arguments);
+        //console.log("creating hero");
+        this.point = {x:x, y:y};
+        g.clear();
+        g.setStrokeStyle(1)
+                .beginStroke(createjs.Graphics.getRGB(0,0,0))
+                .beginFill(createjs.Graphics.getRGB(255,0,0))
+                .drawCircle(0,0,25);
+        this.shape = new createjs.Shape(g);
+        this.shape.x = this.point.x;
+        this.shape.y = this.point.y;
+        this.addChild(this.shape);
+        this.addEventListener('pressmove', drawPath);
+
+        this.speed = 0.3; // pixels per millisecond
+
+        stage.addChild(this);
+
+        stage.update();
+
+        var container = this;
+
+        this.move = function(distToMove) {
+            //console.log("moving " + distToMove + " pixels");
+            var pathCurrentPoint = container.path.getCurrentPoint();
+            var distToNext = distance(container.point, pathCurrentPoint);
+            if (distToNext > distToMove) {
+                var movePct = distToMove/distToNext;
+                var xdist = (pathCurrentPoint.x - container.point.x)*movePct;
+                var ydist = (pathCurrentPoint.y - container.point.y)*movePct;
+                container.point.x += xdist;
+                container.point.y += ydist;
+                container.shape.x = container.point.x;
+                container.shape.y = container.point.y;
+            }
+            // if there's one point left in the path, move there and kill the path
+            else if (container.path.points.length == container.path.currentIndex + 1) {
+                container.point = pathCurrentPoint;
+                container.shape.x = container.point.x;
+                container.shape.y = container.point.y;
+                container.path.length = 0;
+                container.path = null;
+            }
+            // otherwise we need to move more than one point along the path. move to that point and recurse
+            else {
+                container.point = pathCurrentPoint;
+                container.shape.x = container.point.x;
+                container.shape.y = container.point.y;
+                //console.log("path index: " + that.path.currentIndex);
+                container.path.currentIndex++;
+                container.move(distToMove - distToNext);
+            }
+            stage.update();
+        }
+
+        this.tick = function() {
+            if (container.path != null) {
+                //console.log("moving");
+                var msPerFrame = 1000/createjs.Ticker.getMeasuredFPS();
+                //console.log("speed = " + that.speed + ", fps = " + createjs.Ticker.getMeasuredFPS() + ", msPerFrame = " + msPerFrame);
+                var distToMove = container.speed*msPerFrame;
+                container.move(distToMove);
+            }
+            else {
+                //console.log("no path");
+            }
+            //console.log(createjs.Ticker.getMeasuredFPS());
+        }
+
+        createjs.Ticker.addEventListener("tick", this.tick);
+
+        //console.log("hero created");
+    }
+
+    function Path(points) {
+        this.points = points;
+        this.currentIndex = 0;
+        /*this.shape = new createjs.Shape(g);
+        if (points.length > 1) {
+            this.shape.moveTo(points[0].x, points[0].y);
+            for (var i = 1; i < points.length; i++) {
+                this.shape.graphics.lt(points[i].x, points[i].y);
+            }
+        }*/
+    }
+
+    Path.prototype = {
+        constructor: Path,
+        addPoint:function(point) {
+            this.points.push(point);
+            /*this.shape.graphics.lt(point.x, point.y);
+            stage.update();*/
+        },
+        getCurrentPoint:function() {
+            return this.points[this.currentIndex];
+        }
+    }
+
+    function distance(a, b) {
+        var xdist = a.x-b.x;
+        var ydist = a.y-b.y;
+        return (Math.sqrt((xdist*xdist + ydist*ydist)));
+    }
+
+    function direction(a, b) {
+        var xdiff = a.x - b.x;
+        var ydiff = a.y - b.y;
+        return Math.atan2(ydiff, xdiff);
+    }
+
+</script>
+<body onload="loadGame()">
+    <canvas id="main" style="background-color:black" height="500px" width="750px"></canvas>
+</body>
+<style>
+</style>
+</html>
